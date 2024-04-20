@@ -1,5 +1,5 @@
 name: "Syslog"
-version: "0.0.2"
+version: "0.0.2.dev0"
 slug: "syslog"
 description: "Send your HAOS logs to a remote syslog server"
 url: "https://github.com/mib1185/ha-addon-syslog"
@@ -9,6 +9,7 @@ arch:
   - armhf
   - armv7
   - i386
+image: mib85/{arch}-ha-addon-syslog
 init: false
 startup: services
 journald: true
