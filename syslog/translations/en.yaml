@@ -1,0 +1,10 @@
+configuration:
+  syslog_host:
+    name: Syslog host
+    description: The hostname or IP address of the remote syslog server to send HAOS logs to.
+  syslog_port:
+    name: Syslog port
+    description: The port of the remote syslog server to send HAOS logs to.
+  syslog_protocol:
+    name: Transfer protocol
+    description: The protocol to be used to send HAOS logs.

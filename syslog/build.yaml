@@ -1,0 +1,11 @@
+build_from:
+  aarch64: "ghcr.io/home-assistant/aarch64-base-debian:bookworm"
+  amd64: "ghcr.io/home-assistant/amd64-base-debian:bookworm"
+  armhf: "ghcr.io/home-assistant/armhf-base-debian:bookworm"
+  armv7: "ghcr.io/home-assistant/armv7-base-debian:bookworm"
+  i386: "ghcr.io/home-assistant/i386-base-debian:bookworm"
+labels:
+  org.opencontainers.image.title: "Syslog"
+  org.opencontainers.image.description: "Send your HAOS logs to a remote syslog server"
+  org.opencontainers.image.source: "https://github.com/mib1185/ha-addon-syslog"
+  org.opencontainers.image.licenses: "Apache License 2.0"
