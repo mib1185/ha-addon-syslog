@@ -8,6 +8,8 @@ SYSLOG_PORT=$(bashio::config 'syslog_port')
 export SYSLOG_PORT
 SYSLOG_PROTO=$(bashio::config 'syslog_protocol')
 export SYSLOG_PROTO
+HAOS_HOSTNAME=$(bashio::info.hostname)
+export HAOS_HOSTNAME
 
 # Run daemon
 bashio::log.info "Starting the daemon..."
