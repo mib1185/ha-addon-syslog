@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Determine correct syslog level for ha core, supervisor and haos host messages
+
 ## 0.1.0
 
 - Use pre-built images
