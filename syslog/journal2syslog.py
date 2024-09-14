@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
-from os import environ
 import re
 import socket
+import ssl
+from os import environ
+
 from systemd import journal
 
 SYSLOG_HOST = str(environ["SYSLOG_HOST"])
 SYSLOG_PORT = int(environ["SYSLOG_PORT"])
 SYSLOG_PROTO = str(environ["SYSLOG_PROTO"])
+SYSLOG_SSL = True if environ["SYSLOG_SSL"] == "true" else False
+SYSLOG_SSL_VERIFY = True if environ["SYSLOG_SSL_VERIFY"] == "true" else False
 HAOS_HOSTNAME = str(environ["HAOS_HOSTNAME"])
 
 LOGGING_NAME_TO_LEVEL_MAPPING = logging.getLevelNamesMapping()
@@ -31,6 +35,78 @@ CONTAINER_PATTERN_MAPPING = {
     "homeassistant": PATTERN_LOGLEVEL_HA,
     "hassio_supervisor": PATTERN_LOGLEVEL_HA,
 }
+
+
+class TlsSysLogHandler(logging.handlers.SysLogHandler):
+    def __init__(
+        self,
+        address: tuple[str, int]
+        | str = ("localhost", logging.handlers.SYSLOG_UDP_PORT),
+        facility: str | int = logging.handlers.SysLogHandler.LOG_USER,
+        socktype: logging.handlers.SocketKind | None = None,
+        ssl: bool | ssl.SSLContext = False,
+    ) -> None:
+        self.ssl = ssl
+        if ssl and socktype != socket.SOCK_STREAM:
+            raise RuntimeError("TLS is only support for TCP connections")
+        super().__init__(address, facility, socktype)
+
+    def _wrap_sock_ssl(self, sock: socket.socket, host: str):
+        """Wrap a tcp socket into a ssl context."""
+        if isinstance(self.ssl, ssl.SSLContext):
+            context = self.ssl
+        else:
+            context = ssl.create_default_context()
+
+        return context.wrap_socket(sock, server_hostname=host)
+
+    def createSocket(self):
+        """
+        Try to create a socket and, if it's not a datagram socket, connect it
+        to the other end. This method is called during handler initialization,
+        but it's not regarded as an error if the other end isn't listening yet
+        --- the method will be called again when emitting an event,
+        if there is no socket at that point.
+        """
+        address = self.address
+        socktype = self.socktype
+
+        if isinstance(address, str):
+            self.unixsocket = True
+            # Syslog server may be unavailable during handler initialisation.
+            # C's openlog() function also ignores connection errors.
+            # Moreover, we ignore these errors while logging, so it's not worse
+            # to ignore it also here.
+            try:
+                self._connect_unixsocket(address)
+            except OSError:
+                pass
+        else:
+            self.unixsocket = False
+            if socktype is None:
+                socktype = socket.SOCK_DGRAM
+            host, port = address
+            ress = socket.getaddrinfo(host, port, 0, socktype)
+            if not ress:
+                raise OSError("getaddrinfo returns an empty list")
+            for res in ress:
+                af, socktype, proto, _, sa = res
+                err = sock = None
+                try:
+                    sock = socket.socket(af, socktype, proto)
+                    if self.ssl:
+                        sock = self._wrap_sock_ssl(sock, host)
+                    if socktype == socket.SOCK_STREAM:
+                        sock.connect(sa)
+                    break
+                except (OSError, ssl.SSLError) as exc:
+                    err = exc
+                    if sock is not None:
+                        sock.close()
+            if err is not None:
+                raise err
+            self.socket = sock
+            self.socktype = socktype
 
 
 def parse_log_level(message: str, container_name: str) -> int:
@@ -64,8 +140,14 @@ if SYSLOG_PROTO.lower() == "udp":
 else:
     socktype = socket.SOCK_STREAM
 
-syslog_handler = logging.handlers.SysLogHandler(
-    address=(SYSLOG_HOST, SYSLOG_PORT), socktype=socktype
+use_ssl = SYSLOG_SSL
+if SYSLOG_SSL and not SYSLOG_SSL_VERIFY:
+    use_ssl = ssl.create_default_context()
+    use_ssl.check_hostname = False
+    use_ssl.verify_mode = ssl.CERT_NONE
+
+syslog_handler = TlsSysLogHandler(
+    address=(SYSLOG_HOST, SYSLOG_PORT), socktype=socktype, ssl=use_ssl
 )
 formatter = logging.Formatter(
     f"%(asctime)s %(ip)s %(prog)s: %(message)s",

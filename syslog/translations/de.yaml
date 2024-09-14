@@ -8,3 +8,9 @@ configuration:
   syslog_protocol:
     name: Übertragungsprotokol
     description: Das Übertragungsprotokol welches zum Senden der HAOS-Logs verwendet werden soll.
+  syslog_ssl:
+    name: SSL Verschlüsselung
+    description: Aktivieren oder deaktivieren der SSL Verschlüsselung (wird nur bei tcp unterstützt).
+  syslog_ssl_verify:
+    name: SSL-Zertifikat überprüfen
+    description: Prüfung des SSL-Zertifikate aktivieren oder dekativieren.

@@ -8,3 +8,9 @@ configuration:
   syslog_protocol:
     name: Transfer protocol
     description: The protocol to be used to send HAOS logs.
+  syslog_ssl:
+    name: SSL encryption
+    description: Whether or not to to use ssl encryption (only supported with tcp).
+  syslog_ssl_verify:
+    name: SSL verify
+    description: Whether or not to verify ssl certificate.

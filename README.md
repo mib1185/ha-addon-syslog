@@ -2,7 +2,7 @@
 
 ![Supports aarch64 Architecture][aarch64-shield] ![Supports amd64 Architecture][amd64-shield] ![Supports armhf Architecture][armhf-shield] ![Supports armv7 Architecture][armv7-shield] ![Supports i386 Architecture][i386-shield]
 
- ... to send your HAOS logs to a remote syslog server
+ ... to send your HAOS logs to a remote syslog server. UDP and TCP transport is support, as also TLS encrypted transport.
 
 ## How to use this repository
 

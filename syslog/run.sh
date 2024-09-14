@@ -8,6 +8,10 @@ SYSLOG_PORT=$(bashio::config 'syslog_port')
 export SYSLOG_PORT
 SYSLOG_PROTO=$(bashio::config 'syslog_protocol')
 export SYSLOG_PROTO
+SYSLOG_SSL=$(bashio::config 'syslog_ssl')
+export SYSLOG_SSL
+SYSLOG_SSL_VERIFY=$(bashio::config 'syslog_ssl_verify')
+export SYSLOG_SSL_VERIFY
 HAOS_HOSTNAME=$(bashio::info.hostname)
 export HAOS_HOSTNAME
 

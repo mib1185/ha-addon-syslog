@@ -1,5 +1,5 @@
 name: "Syslog"
-version: "0.2.0"
+version: "0.3.0"
 slug: "syslog"
 description: "Send your HAOS logs to a remote syslog server"
 url: "https://github.com/mib1185/ha-addon-syslog"
@@ -17,7 +17,11 @@ options:
   syslog_host: syslog.local
   syslog_port: 514
   syslog_protocol: udp
+  syslog_ssl: false
+  syslog_ssl_verify: true
 schema:
   syslog_host: str
   syslog_port: int
   syslog_protocol: list(udp|tcp)
+  syslog_ssl: bool
+  syslog_ssl_verify: bool
