@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Add tls support
+
 ## 0.2.0
 
 - Determine correct syslog level for ha core, supervisor and haos host messages
