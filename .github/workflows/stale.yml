@@ -1,0 +1,24 @@
+name: Stale
+
+on:
+  schedule:
+  - cron: '00 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+    - name: stale issues
+      uses: actions/stale@v9.0.0
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        days-before-stale: 60
+        days-before-close: 7
+        days-before-pr-stale: -1
+        days-before-pr-close: -1
+        stale-issue-label: 'stale'
+        stale-issue-message: >
+          There hasn't been any activity on this issue recently.
+          This issue has now been marked as stale and will be closed if no
+          further activity occurs.
