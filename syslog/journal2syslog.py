@@ -60,6 +60,15 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
 
         return context.wrap_socket(sock, server_hostname=host)
 
+    def handleError(self, _):
+        """
+        Handle errors silent
+        Close failing socket so next emit will try to create a new socket
+        """
+        if self.socket is not None:
+            self.socket.close()
+            self.socket = None
+
     def createSocket(self):
         """
         Try to create a socket and, if it's not a datagram socket, connect it
