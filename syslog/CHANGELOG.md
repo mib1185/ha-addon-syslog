@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Handle unavailable syslog server
+
 ## 0.3.0
 
 - Add tls support

@@ -1,5 +1,5 @@
 name: "Syslog"
-version: "0.3.0"
+version: "0.4.0"
 slug: "syslog"
 description: "Send your HAOS logs to a remote syslog server"
 url: "https://github.com/mib1185/ha-addon-syslog"
