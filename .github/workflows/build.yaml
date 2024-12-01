@@ -5,6 +5,7 @@ on:
     branches: ["main"]
   push:
     branches: ["main"]
+    tags: ["*"]
 
 jobs:
   build:
@@ -27,7 +28,10 @@ jobs:
       - name: Set build arguments
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              echo "BUILD_ARGS=--test" >> $GITHUB_ENV;
+              echo "TEST_FLAG=--test" >> $GITHUB_ENV;
+          fi
+          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.head_ref }}" == "refs/heads/main" ]]; then
+              echo "VERSION_FLAG=--version dev --no-latest" >> $GITHUB_ENV;
           fi
 
       - name: Login to DockerHub
@@ -41,7 +45,8 @@ jobs:
         uses: home-assistant/builder@2024.08.2
         with:
           args: |
-            ${{ env.BUILD_ARGS }} \
+            ${{ env.TEST_FLAG }} \
+            ${{ env.VERSION_FLAG }} \
             --${{ matrix.arch }} \
             --target /data/syslog \
             --addon
