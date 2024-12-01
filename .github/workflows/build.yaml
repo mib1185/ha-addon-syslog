@@ -30,7 +30,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               echo "TEST_FLAG=--test" >> $GITHUB_ENV;
           fi
-          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.head_ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
               echo "VERSION_FLAG=--version dev --no-latest" >> $GITHUB_ENV;
           fi
 
