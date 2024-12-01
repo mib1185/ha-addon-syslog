@@ -112,7 +112,8 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
                     err = exc
                     if sock is not None:
                         sock.close()
-            if err is not None:
+            if isinstance(err, ssl.SSLError):
+                # only fail on ssl errors
                 raise err
             self.socket = sock
             self.socktype = socktype
