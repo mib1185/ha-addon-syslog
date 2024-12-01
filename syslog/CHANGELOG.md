@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Fix tagging of containers
+
 ## 0.4.0
 
 - Handle unavailable syslog server
