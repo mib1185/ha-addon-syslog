@@ -12,8 +12,13 @@ the easiest way is to use the following *my home assistant* link to add this rep
 
 Or navigate to **Settings** -> **Add-ons** -> **Add-on store** -> **3 dots top right corner** -> **Repositories** than add `https://github.com/mib1185/ha-addon-syslog` as new repository.
 
+## How to configure this add-on
+
+see the add-on [docs](syslog/DOCS.md)
+
 ---
-You like my work?
+
+## You like my work?
 
 <a href="https://www.buymeacoffee.com/mib1185" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
