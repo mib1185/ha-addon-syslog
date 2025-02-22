@@ -48,6 +48,6 @@ jobs:
             ${{ env.TEST_FLAG }} \
             ${{ env.VERSION_FLAG }} \
             --${{ matrix.arch }} \
-            --image {{ matrix.arch }} \
+            --image ${{ matrix.arch }} \
             --target /data/syslog \
             --addon
