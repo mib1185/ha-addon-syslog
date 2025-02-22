@@ -42,12 +42,12 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build syslog add-on
-        uses: home-assistant/builder@2024.08.2
+        uses: mib1185/homeassistant-builder@80d810af42a2b05cc03bcdebe6a6c3be56cbb40b
         with:
+          image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
           args: |
             ${{ env.TEST_FLAG }} \
             ${{ env.VERSION_FLAG }} \
             --${{ matrix.arch }} \
-            --image ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }} \
             --target /data/syslog \
             --addon
