@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     name: Build ${{ matrix.arch }} syslog add-on
     strategy:
       matrix:
