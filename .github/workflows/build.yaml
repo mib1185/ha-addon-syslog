@@ -48,6 +48,6 @@ jobs:
             ${{ env.TEST_FLAG }} \
             ${{ env.VERSION_FLAG }} \
             --${{ matrix.arch }} \
-            --image ${{ matrix.arch }} \
+            --image ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }} \
             --target /data/syslog \
             --addon
