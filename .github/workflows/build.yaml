@@ -43,7 +43,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build syslog add-on
-        uses: homeassistant-builder@2025.02.0
+        uses: home-assistant/builder@2025.02.0
         with:
           image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
           args: |
