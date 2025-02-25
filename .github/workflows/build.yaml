@@ -9,11 +9,12 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     name: Build ${{ matrix.arch }} syslog add-on
     strategy:
       matrix:
         arch: ["aarch64", "amd64", "armhf", "armv7", "i386"]
+        # arch: ["aarch64"]
 
     steps:
       - name: Check out repository
@@ -42,8 +43,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build syslog add-on
-        uses: home-assistant/builder@2024.08.2
+        uses: home-assistant/builder@2025.02.0
         with:
+          image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
           args: |
             ${{ env.TEST_FLAG }} \
             ${{ env.VERSION_FLAG }} \
