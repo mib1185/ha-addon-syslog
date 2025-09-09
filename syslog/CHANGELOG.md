@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- betterstack added
+
 ## 0.4.1
 
 - Fix tagging of containers
