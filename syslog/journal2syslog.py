@@ -15,6 +15,7 @@ SYSLOG_PROTO = str(environ["SYSLOG_PROTO"])
 SYSLOG_SSL = True if environ["SYSLOG_SSL"] == "true" else False
 SYSLOG_SSL_VERIFY = True if environ["SYSLOG_SSL_VERIFY"] == "true" else False
 HAOS_HOSTNAME = str(environ["HAOS_HOSTNAME"])
+LOGTAIL_TOKEN = environ.get("LOGTAIL_TOKEN")
 
 LOGGING_NAME_TO_LEVEL_MAPPING = logging.getLevelNamesMapping()
 LOGGING_JOURNAL_PRIORITY_TO_LEVEL_MAPPING = [
@@ -194,6 +195,10 @@ while True:
             log_level = last_container_log_level.get(
                 container_name, LOGGING_DEFAULT_LEVEL
             )
+
+        if LOGTAIL_TOKEN:
+            structured_data = f'[logtail@11993 source_token="{LOGTAIL_TOKEN}"]'
+            msg = f"{structured_data} {msg}"
 
         # send syslog message
         logger.log(level=log_level, msg=msg, extra=extra)
