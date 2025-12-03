@@ -15,6 +15,7 @@ SYSLOG_PORT = int(environ["SYSLOG_PORT"])
 SYSLOG_PROTO = str(environ["SYSLOG_PROTO"])
 SYSLOG_SSL = True if environ["SYSLOG_SSL"] == "true" else False
 SYSLOG_SSL_VERIFY = True if environ["SYSLOG_SSL_VERIFY"] == "true" else False
+SYSLOG_FORMAT = environ.get("SYSLOG_FORMAT", "RFC3164")
 HAOS_HOSTNAME = str(environ["HAOS_HOSTNAME"])
 
 LOGGING_NAME_TO_LEVEL_MAPPING = logging.getLevelNamesMapping()
@@ -124,7 +125,7 @@ class RFC5424Formatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):
         """Return the creation time of the specified LogRecord as formatted text."""
         dt = datetime.datetime.fromtimestamp(record.created, datetime.timezone.utc)
-        return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        return dt.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def parse_log_level(message: str, container_name: str) -> int:
@@ -167,10 +168,19 @@ if SYSLOG_SSL and not SYSLOG_SSL_VERIFY:
 syslog_handler = TlsSysLogHandler(
     address=(SYSLOG_HOST, SYSLOG_PORT), socktype=socktype, ssl=use_ssl
 )
-formatter = RFC5424Formatter(
-    fmt="1 %(asctime)s %(ip)s %(prog)s %(procid)s - - %(message)s",
-    defaults={"ip": HAOS_HOSTNAME},
-)
+
+if SYSLOG_FORMAT == "RFC5424":
+    formatter = RFC5424Formatter(
+        fmt="1 %(asctime)s %(ip)s %(prog)s %(procid)s - - %(message)s",
+        defaults={"ip": HAOS_HOSTNAME},
+    )
+else:
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(ip)s %(prog)s: %(message)s",
+        defaults={"ip": HAOS_HOSTNAME},
+        datefmt="%b %d %H:%M:%S",
+    )
+
 syslog_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 
@@ -180,18 +190,21 @@ last_container_log_level: dict[str, int] = {}
 while True:
     change = jr.wait(timeout=None)
     for entry in jr:
-        # RFC 5424 parameters
-        prog = entry.get("SYSLOG_IDENTIFIER") or "-"
-        procid = entry.get("_PID") or "-"
-        extra = {"prog": prog, "procid": procid}
+        if SYSLOG_FORMAT == "RFC5424":
+            # RFC 5424 parameters
+            prog = entry.get("SYSLOG_IDENTIFIER") or "-"
+            procid = entry.get("_PID") or "-"
+            extra = {"prog": prog, "procid": procid}
+        else:
+            extra = {"prog": entry.get("SYSLOG_IDENTIFIER")}
 
         # remove shell colors from container messages
         if (container_name := entry.get("CONTAINER_NAME")) is not None:
-            msg = re.sub(r"\x1b\[\d+m", "", entry.get("MESSAGE"))
+            msg = re.sub(r"\x1b[[\]\d+m", "", entry.get("MESSAGE"))
         else:
             msg = entry.get("MESSAGE")
 
-        if isinstance(msg, str):
+        if SYSLOG_FORMAT == "RFC5424" and isinstance(msg, str):
             msg = msg.replace("\n", "#012").replace("\r", "")
 
         # determine syslog level

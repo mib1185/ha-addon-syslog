@@ -2,7 +2,8 @@
 
 ## 0.4.2
 
-- Make messages RF5424 compliant
+- Add RF5424 compliant format option
+- Remove obsolete architectures armv7, armhf, i386 (no longer supported as of Home Assistant 2025.11.0)
 
 ## 0.4.1
 

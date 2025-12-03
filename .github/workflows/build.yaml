@@ -44,7 +44,7 @@ jobs:
       - name: Build syslog add-on
         uses: home-assistant/builder@2025.11.0
         with:
-          image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
+          image: ${{ matrix.arch }}
           args: |
             ${{ env.TEST_FLAG }} \
             ${{ env.VERSION_FLAG }} \

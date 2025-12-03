@@ -14,3 +14,6 @@ configuration:
   syslog_ssl_verify:
     name: SSL-Zertifikat überprüfen
     description: Prüfung des SSL-Zertifikate aktivieren oder dekativieren.
+  syslog_format:
+    name: Syslog Format
+    description: Das Format der Syslog-Nachricht.
