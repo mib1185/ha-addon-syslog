@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5.0.0
+        uses: actions/checkout@v6.0.1
 
       - name: Get information
         id: info
@@ -43,7 +43,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build syslog add-on
-        uses: home-assistant/builder@2025.09.0
+        uses: home-assistant/builder@2025.11.0
         with:
           image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
           args: |
