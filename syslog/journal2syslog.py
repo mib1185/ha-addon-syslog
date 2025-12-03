@@ -200,7 +200,7 @@ while True:
 
         # remove shell colors from container messages
         if (container_name := entry.get("CONTAINER_NAME")) is not None:
-            msg = re.sub(r"\x1b[[\]\d+m", "", entry.get("MESSAGE"))
+            msg = re.sub(r"\x1b\[[0-9;]*m", "", entry.get("MESSAGE"))
         else:
             msg = entry.get("MESSAGE")
 
