@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Make messages RF5424 compliant
+
 ## 0.4.1
 
 - Fix tagging of containers
