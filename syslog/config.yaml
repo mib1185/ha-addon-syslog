@@ -1,14 +1,11 @@
 name: "Syslog"
-version: "0.4.1"
+version: "0.4.2"
 slug: "syslog"
 description: "Send your HAOS logs to a remote syslog server"
 url: "https://github.com/mib1185/ha-addon-syslog"
 arch:
   - aarch64
   - amd64
-  - armhf
-  - armv7
-  - i386
 image: mib85/{arch}-ha-addon-syslog
 init: false
 startup: services
@@ -19,9 +16,11 @@ options:
   syslog_protocol: udp
   syslog_ssl: false
   syslog_ssl_verify: true
+  syslog_format: RFC3164
 schema:
   syslog_host: str
   syslog_port: int
   syslog_protocol: list(udp|tcp)
   syslog_ssl: bool
   syslog_ssl_verify: bool
+  syslog_format: list(RFC3164|RFC5424)

@@ -12,6 +12,8 @@ SYSLOG_SSL=$(bashio::config 'syslog_ssl')
 export SYSLOG_SSL
 SYSLOG_SSL_VERIFY=$(bashio::config 'syslog_ssl_verify')
 export SYSLOG_SSL_VERIFY
+SYSLOG_FORMAT=$(bashio::config 'syslog_format')
+export SYSLOG_FORMAT
 HAOS_HOSTNAME=$(bashio::info.hostname)
 export HAOS_HOSTNAME
 
