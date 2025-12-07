@@ -6,6 +6,7 @@ import re
 import socket
 import ssl
 from os import environ
+from datetime import datetime
 
 from systemd import journal
 
@@ -36,6 +37,10 @@ CONTAINER_PATTERN_MAPPING = {
     "hassio_supervisor": PATTERN_LOGLEVEL_HA,
 }
 
+class RFC5424Formatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=datetime.timezone.utc)
+        return dt.isoformat().replace('+00:00', 'Z')
 
 class TlsSysLogHandler(logging.handlers.SysLogHandler):
     def __init__(
@@ -159,10 +164,9 @@ if SYSLOG_SSL and not SYSLOG_SSL_VERIFY:
 syslog_handler = TlsSysLogHandler(
     address=(SYSLOG_HOST, SYSLOG_PORT), socktype=socktype, ssl=use_ssl
 )
-formatter = logging.Formatter(
+formatter = RFC5424Formatter(
     f"%(asctime)s %(ip)s %(prog)s: %(message)s",
-    defaults={"ip": HAOS_HOSTNAME},
-    datefmt="%b %d %H:%M:%S",
+    defaults={"ip": HAOS_HOSTNAME}
 )
 syslog_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
