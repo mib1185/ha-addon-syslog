@@ -6,6 +6,7 @@ import re
 import socket
 import ssl
 from os import environ
+from datetime import datetime, timezone
 
 from systemd import journal
 
@@ -14,6 +15,7 @@ SYSLOG_PORT = int(environ["SYSLOG_PORT"])
 SYSLOG_PROTO = str(environ["SYSLOG_PROTO"])
 SYSLOG_SSL = True if environ["SYSLOG_SSL"] == "true" else False
 SYSLOG_SSL_VERIFY = True if environ["SYSLOG_SSL_VERIFY"] == "true" else False
+SYSLOG_USE_ISO8601 = True if environ["SYSLOG_USE_ISO8601"] == "true" else False
 HAOS_HOSTNAME = str(environ["HAOS_HOSTNAME"])
 
 LOGGING_NAME_TO_LEVEL_MAPPING = logging.getLevelNamesMapping()
@@ -159,11 +161,19 @@ if SYSLOG_SSL and not SYSLOG_SSL_VERIFY:
 syslog_handler = TlsSysLogHandler(
     address=(SYSLOG_HOST, SYSLOG_PORT), socktype=socktype, ssl=use_ssl
 )
-formatter = logging.Formatter(
-    f"%(asctime)s %(ip)s %(prog)s: %(message)s",
-    defaults={"ip": HAOS_HOSTNAME},
-    datefmt="%b %d %H:%M:%S",
-)
+
+if SYSLOG_USE_ISO8601:
+    formatter = logging.Formatter(
+        "%(journal_ts)s %(ip)s %(prog)s: %(message)s",
+        defaults={"ip": HAOS_HOSTNAME},
+    )
+else:
+    formatter = logging.Formatter(
+        f"%(asctime)s %(ip)s %(prog)s: %(message)s",
+        defaults={"ip": HAOS_HOSTNAME},
+        datefmt="%b %d %H:%M:%S",
+    )
+
 syslog_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 
@@ -174,6 +184,17 @@ while True:
     change = jr.wait(timeout=None)
     for entry in jr:
         extra = {"prog": entry.get("SYSLOG_IDENTIFIER")}
+
+        if SYSLOG_USE_ISO8601:
+            ts = entry.get("__REALTIME_TIMESTAMP")
+            if isinstance(ts, datetime):
+                ts_utc = ts.astimezone()
+            else:
+                # __REALTIME_TIMESTAMP is µs since epoch
+                ts_utc = datetime.fromtimestamp(ts / 1_000_000, tz=timezone.utc)
+
+            journal_ts = ts_utc.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+            extra.update({"journal_ts": journal_ts})
 
         # remove shell colors from container messages
         if (container_name := entry.get("CONTAINER_NAME")) is not None:

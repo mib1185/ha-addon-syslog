@@ -14,6 +14,7 @@ syslog_port: 514
 syslog_protocol: udp
 syslog_ssl: false
 syslog_ssl_verfify: false
+syslog_use_iso8601: false
 ```
 
 | key | name | description |
@@ -23,6 +24,7 @@ syslog_ssl_verfify: false
 | `syslog_protocol` | Transfer protocol | The protocol to be used to send HAOS logs. |
 | `syslog_ssl` | SSL encryption | Whether or not to to use ssl encryption (only supported with tcp). |
 | `syslog_ssl_verfify` | SSL verify | Whether or not to verify ssl certificate. |
+| `syslog_use_iso8601` | Use ISO8601 Timestamps |  Whether or not to use ISO8601-formatted timestamps. |
 
 ## Support
 

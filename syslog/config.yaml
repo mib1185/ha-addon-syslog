@@ -19,9 +19,11 @@ options:
   syslog_protocol: udp
   syslog_ssl: false
   syslog_ssl_verify: true
+  syslog_use_iso8601: false
 schema:
   syslog_host: str
   syslog_port: int
   syslog_protocol: list(udp|tcp)
   syslog_ssl: bool
   syslog_ssl_verify: bool
+  syslog_use_iso8601: bool

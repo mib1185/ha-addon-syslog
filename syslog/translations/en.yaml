@@ -14,3 +14,6 @@ configuration:
   syslog_ssl_verify:
     name: SSL verify
     description: Whether or not to verify ssl certificate.
+  syslog_use_iso8601:
+    name: Use ISO8601 Timestamps
+    description: Whether or not to use ISO8601-formatted timestamps.
