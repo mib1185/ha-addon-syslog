@@ -1,10 +1,8 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
-RUN apt-get update \
-    && apt-get install -y python3-systemd \
-    && apt-get clean autoclean \
-    && apt-get autoremove -y
+RUN apk --no-cache add py3-pip pkgconfig elogind-dev gcc python3-dev libc-dev \
+    && pip install --break-system-packages systemd-python
 
 COPY bashio_info.sh /
 COPY journal2syslog.py /
