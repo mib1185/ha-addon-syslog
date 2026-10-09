@@ -135,13 +135,6 @@ def parse_log_level(message: str, container_name: str) -> int:
 
 
 # start journal reader and seek to end of journal
-#
-# NOTE: Intentionally NOT calling jr.this_boot() here.
-# In containers (like HA add-ons), the boot ID from
-# /proc/sys/kernel/random/boot_id is the container's boot ID, which
-# doesn't match any boot ID in the host's journal (mounted from
-# /var/log/journal). this_boot() would silently filter out ALL entries,
-# causing the add-on to appear working but never forward any logs.
 jr = journal.Reader(path="/var/log/journal")
 jr.seek_tail()
 jr.get_previous()
