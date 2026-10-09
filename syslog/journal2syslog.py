@@ -270,11 +270,10 @@ while True:
 
         # determine syslog level
         if not container_name:
-            try:
-                log_level = LOGGING_JOURNAL_PRIORITY_TO_LEVEL_MAPPING[
-                    entry.get("PRIORITY", 6)
-                ]
-            except (IndexError, TypeError):  # invalid client-supplied PRIORITY
+            priority = entry.get("PRIORITY", 6)
+            if isinstance(priority, int) and 0 <= priority <= 7:
+                log_level = LOGGING_JOURNAL_PRIORITY_TO_LEVEL_MAPPING[priority]
+            else:  # invalid client-supplied PRIORITY
                 log_level = LOGGING_DEFAULT_LEVEL
         elif container_name not in CONTAINER_PATTERN_MAPPING:
             log_level = LOGGING_DEFAULT_LEVEL
