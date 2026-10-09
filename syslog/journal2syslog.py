@@ -204,10 +204,8 @@ def parse_log_level(message: str, container_name: str) -> int:
 
 # start journal reader and seek to end of journal
 jr = journal.Reader(path="/var/log/journal")
-jr.this_boot()
 jr.seek_tail()
 jr.get_previous()
-jr.get_next()
 
 # start logger
 logger = logging.getLogger("")
