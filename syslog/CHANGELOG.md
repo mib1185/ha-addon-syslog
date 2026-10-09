@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Rename add-on to app
+
 ## 0.5.1
 
 - Fix forwarder crash on journal messages with invalid UTF-8 or repeated fields

@@ -1,4 +1,4 @@
-name: Build add-on
+name: Build app
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    name: Build ${{ matrix.arch }} syslog add-on
+    name: Build ${{ matrix.arch }} syslog app
     strategy:
       matrix:
         arch: ["aarch64", "amd64", "armhf", "armv7", "i386"]
@@ -42,7 +42,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build syslog add-on
+      - name: Build syslog app
         uses: home-assistant/builder@2025.09.0
         with:
           image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
