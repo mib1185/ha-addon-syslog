@@ -1,12 +1,12 @@
-# Syslog Home Assistant add-on
+# Syslog Home Assistant app
 
 ## How to use
 
-This add-on allows you to send your HAOS logs to a remote syslog server.
+This app allows you to send your HAOS logs to a remote syslog server.
 
 ## Configuration
 
-Add-on configuration:
+App configuration:
 
 ```yaml
 syslog_host: syslog.local
@@ -31,3 +31,7 @@ syslog_format: rfc3164
 In case you've found a bug, please [open an issue on GitHub][issue].
 
 [issue]: https://github.com/mib1185/ha-addon-syslog/issues
+
+# You like my work?
+
+<a href="https://www.buymeacoffee.com/mib1185" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="41" width="174"></a>
