@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- Add option to choose between RFC3164 (BSD) and RFC5424 syslog format
+
 ## 0.4.1
 
 - Fix tagging of containers

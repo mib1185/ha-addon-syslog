@@ -5,6 +5,7 @@ import logging.handlers
 import re
 import socket
 import ssl
+from datetime import datetime
 from os import environ
 
 from systemd import journal
@@ -14,6 +15,7 @@ SYSLOG_PORT = int(environ["SYSLOG_PORT"])
 SYSLOG_PROTO = str(environ["SYSLOG_PROTO"])
 SYSLOG_SSL = True if environ["SYSLOG_SSL"] == "true" else False
 SYSLOG_SSL_VERIFY = True if environ["SYSLOG_SSL_VERIFY"] == "true" else False
+SYSLOG_FORMAT = str(environ.get("SYSLOG_FORMAT", "rfc3164")).lower()
 HAOS_HOSTNAME = str(environ["HAOS_HOSTNAME"])
 
 LOGGING_NAME_TO_LEVEL_MAPPING = logging.getLevelNamesMapping()
@@ -45,8 +47,10 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
         facility: str | int = logging.handlers.SysLogHandler.LOG_USER,
         socktype: logging.handlers.SocketKind | None = None,
         ssl: bool | ssl.SSLContext = False,
+        octet_counting: bool = False,
     ) -> None:
         self.ssl = ssl
+        self.octet_counting = octet_counting
         if ssl and socktype != socket.SOCK_STREAM:
             raise RuntimeError("TLS is only support for TCP connections")
         super().__init__(address, facility, socktype)
@@ -59,6 +63,27 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
             context = ssl.create_default_context()
 
         return context.wrap_socket(sock, server_hostname=host)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """
+        Emit a record, using octet-counting framing (RFC6587/RFC5425)
+        for stream sockets if enabled
+        """
+        if not self.octet_counting or self.socktype != socket.SOCK_STREAM:
+            return super().emit(record)
+        try:
+            msg = self.format(record)
+            if self.ident:
+                msg = self.ident + msg
+            prio = "<%d>" % self.encodePriority(
+                self.facility, self.mapPriority(record.levelname)
+            )
+            data = (prio + msg).encode("utf-8")
+            if not self.socket:
+                self.createSocket()
+            self.socket.sendall(b"%d %b" % (len(data), data))
+        except Exception:
+            self.handleError(record)
 
     def handleError(self, _):
         """
@@ -119,6 +144,46 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
             self.socktype = socktype
 
 
+class Rfc5424Formatter(logging.Formatter):
+    """
+    Format log records according to RFC5424
+    <PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID STRUCTURED-DATA MSG
+    (<PRI> is prepended by the SysLogHandler)
+    """
+
+    NILVALUE = "-"
+
+    def __init__(self, hostname: str) -> None:
+        super().__init__(
+            "1 %(asctime)s %(hostname)s %(appname)s %(procid)s %(msgid)s %(sd)s %(message)s"
+        )
+        self.hostname = self._header_field(hostname, 255)
+
+    @classmethod
+    def _header_field(cls, value: str | int | None, max_len: int) -> str:
+        """Header fields must be printable US-ASCII without spaces or NILVALUE."""
+        if value is None:
+            return cls.NILVALUE
+        value = re.sub(r"[^\x21-\x7e]", "", str(value))[:max_len]
+        return value or cls.NILVALUE
+
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        """ISO 8601 timestamp with microseconds and timezone offset."""
+        return (
+            datetime.fromtimestamp(record.created)
+            .astimezone()
+            .isoformat(timespec="microseconds")
+        )
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.hostname = self.hostname
+        record.appname = self._header_field(getattr(record, "prog", None), 48)
+        record.procid = self._header_field(getattr(record, "pid", None), 128)
+        record.msgid = self.NILVALUE
+        record.sd = self.NILVALUE
+        return super().format(record)
+
+
 def parse_log_level(message: str, container_name: str) -> int:
     """
     Try to determine logging level from message
@@ -157,13 +222,21 @@ if SYSLOG_SSL and not SYSLOG_SSL_VERIFY:
     use_ssl.verify_mode = ssl.CERT_NONE
 
 syslog_handler = TlsSysLogHandler(
-    address=(SYSLOG_HOST, SYSLOG_PORT), socktype=socktype, ssl=use_ssl
+    address=(SYSLOG_HOST, SYSLOG_PORT),
+    socktype=socktype,
+    ssl=use_ssl,
+    octet_counting=SYSLOG_FORMAT == "rfc5424",
 )
-formatter = logging.Formatter(
-    f"%(asctime)s %(ip)s %(prog)s: %(message)s",
-    defaults={"ip": HAOS_HOSTNAME},
-    datefmt="%b %d %H:%M:%S",
-)
+if SYSLOG_FORMAT == "rfc5424":
+    formatter = Rfc5424Formatter(hostname=HAOS_HOSTNAME)
+    # trailing NUL byte would become part of MSG in RFC5424
+    syslog_handler.append_nul = False
+else:
+    formatter = logging.Formatter(
+        f"%(asctime)s %(ip)s %(prog)s: %(message)s",
+        defaults={"ip": HAOS_HOSTNAME},
+        datefmt="%b %d %H:%M:%S",
+    )
 syslog_handler.setFormatter(formatter)
 logger.addHandler(syslog_handler)
 
@@ -173,7 +246,7 @@ last_container_log_level: dict[str, int] = {}
 while True:
     change = jr.wait(timeout=None)
     for entry in jr:
-        extra = {"prog": entry.get("SYSLOG_IDENTIFIER")}
+        extra = {"prog": entry.get("SYSLOG_IDENTIFIER"), "pid": entry.get("_PID")}
 
         # remove shell colors from container messages
         if (container_name := entry.get("CONTAINER_NAME")) is not None:
