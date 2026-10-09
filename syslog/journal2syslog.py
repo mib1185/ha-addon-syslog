@@ -202,6 +202,20 @@ def parse_log_level(message: str, container_name: str) -> int:
     return logging.NOTSET
 
 
+def normalize_field(value: str | bytes | list | None) -> str:
+    """
+    Ensure the journal field is a str
+    python-systemd returns bytes for non UTF-8 data and a list for repeated fields
+    """
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return " ".join(normalize_field(item) for item in value)
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 # start journal reader and seek to end of journal
 jr = journal.Reader(path="/var/log/journal")
 jr.seek_tail()
@@ -248,18 +262,20 @@ while True:
     change = jr.wait(timeout=None)
     for entry in jr:
         extra = {"prog": entry.get("SYSLOG_IDENTIFIER"), "pid": entry.get("_PID")}
+        msg = normalize_field(entry.get("MESSAGE"))
+        container_name = normalize_field(entry.get("CONTAINER_NAME"))
 
         # remove shell colors from container messages
-        if (container_name := entry.get("CONTAINER_NAME")) is not None:
-            msg = re.sub(r"\x1b\[\d+m", "", entry.get("MESSAGE"))
-        else:
-            msg = entry.get("MESSAGE")
+        if container_name:
+            msg = re.sub(r"\x1b\[\d+m", "", msg)
 
         # determine syslog level
         if not container_name:
-            log_level = LOGGING_JOURNAL_PRIORITY_TO_LEVEL_MAPPING[
-                entry.get("PRIORITY", 6)
-            ]
+            priority = entry.get("PRIORITY", 6)
+            if isinstance(priority, int) and 0 <= priority <= 7:
+                log_level = LOGGING_JOURNAL_PRIORITY_TO_LEVEL_MAPPING[priority]
+            else:  # invalid client-supplied PRIORITY
+                log_level = LOGGING_DEFAULT_LEVEL
         elif container_name not in CONTAINER_PATTERN_MAPPING:
             log_level = LOGGING_DEFAULT_LEVEL
         elif log_level := parse_log_level(msg, container_name):
