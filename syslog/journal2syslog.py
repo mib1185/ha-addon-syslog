@@ -152,10 +152,11 @@ class Rfc5424Formatter(logging.Formatter):
     """
 
     NILVALUE = "-"
+    BOM = "\ufeff"
 
     def __init__(self, hostname: str) -> None:
         super().__init__(
-            "1 %(asctime)s %(hostname)s %(appname)s %(procid)s %(msgid)s %(sd)s %(message)s"
+            "1 %(asctime)s %(hostname)s %(appname)s %(procid)s %(msgid)s %(sd)s %(bom)s%(message)s"
         )
         self.hostname = self._header_field(hostname, 255)
 
@@ -181,6 +182,8 @@ class Rfc5424Formatter(logging.Formatter):
         record.procid = self._header_field(getattr(record, "pid", None), 128)
         record.msgid = self.NILVALUE
         record.sd = self.NILVALUE
+        # UTF-8 encoded MSG must start with a BOM, pure ASCII is sent as MSG-ANY
+        record.bom = "" if record.getMessage().isascii() else self.BOM
         return super().format(record)
 
 
