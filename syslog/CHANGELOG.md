@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Fix forwarder crash on journal messages with invalid UTF-8 or repeated fields
+- Fix forwarder crash on journal entries with an invalid priority
+
 ## 0.5.0
 
 - Add option to choose between RFC3164 (BSD) and RFC5424 syslog format
