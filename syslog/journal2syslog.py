@@ -202,15 +202,15 @@ def parse_log_level(message: str, container_name: str) -> int:
     return logging.NOTSET
 
 
-def normalize_message(value: str | bytes | list | None) -> str:
+def normalize_field(value: str | bytes | list | None) -> str:
     """
-    Ensure the journal MESSAGE field is a str
+    Ensure the journal field is a str
     python-systemd returns bytes for non UTF-8 data and a list for repeated fields
     """
     if value is None:
         return ""
     if isinstance(value, list):
-        return " ".join(normalize_message(item) for item in value)
+        return " ".join(normalize_field(item) for item in value)
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return str(value)
@@ -262,10 +262,11 @@ while True:
     change = jr.wait(timeout=None)
     for entry in jr:
         extra = {"prog": entry.get("SYSLOG_IDENTIFIER"), "pid": entry.get("_PID")}
-        msg = normalize_message(entry.get("MESSAGE"))
+        msg = normalize_field(entry.get("MESSAGE"))
+        container_name = normalize_field(entry.get("CONTAINER_NAME"))
 
         # remove shell colors from container messages
-        if (container_name := entry.get("CONTAINER_NAME")) is not None:
+        if container_name:
             msg = re.sub(r"\x1b\[\d+m", "", msg)
 
         # determine syslog level
