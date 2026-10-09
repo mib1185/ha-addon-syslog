@@ -14,3 +14,6 @@ configuration:
   syslog_ssl_verify:
     name: SSL verify
     description: Whether or not to verify ssl certificate.
+  syslog_format:
+    name: Syslog format
+    description: The syslog message format, either rfc3164 (BSD syslog) or rfc5424 (ISO 8601 timestamps, structured data header).
