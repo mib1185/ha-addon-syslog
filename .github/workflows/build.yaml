@@ -19,13 +19,7 @@ jobs:
     name: Prepare build
     runs-on: ubuntu-latest
     outputs:
-      build_matrix: ${{ steps.matrix.outputs.matrix }}
-      name: ${{ steps.normalize.outputs.name }}
-      description: ${{ steps.normalize.outputs.description }}
-      url: ${{ steps.normalize.outputs.url }}
-      version: ${{ steps.normalize.outputs.version }}
-      image_tags: ${{ steps.normalize.outputs.image_tags }}
-      publish: ${{ steps.normalize.outputs.publish }}
+      build_matrix: ${{ steps.strip.outputs.matrix }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -38,59 +32,22 @@ jobs:
         with:
           path: ${{ env.APP_PATH }}
 
-      - name: Normalize information
-        id: normalize
-        env:
-          INFO_IMAGE: ${{ steps.info.outputs.image }}
-          INFO_NAME: ${{ steps.info.outputs.name }}
-          INFO_DESCRIPTION: ${{ steps.info.outputs.description }}
-          INFO_URL: ${{ steps.info.outputs.url }}
-          INFO_VERSION: ${{ steps.info.outputs.version }}
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-        run: |
-          # info helper returns JSON encoded values, e.g. "mib85/{arch}-ha-addon-syslog"
-          image=$(jq -r . <<< "${INFO_IMAGE}")
-          image_name=${image##*/}
-          echo "image_name=${image_name#\{arch\}-}" >> "$GITHUB_OUTPUT"
-          echo "registry_prefix=${CONTAINER_REGISTRY}/${image%/*}" >> "$GITHUB_OUTPUT"
-          echo "name=$(jq -r . <<< "${INFO_NAME}")" >> "$GITHUB_OUTPUT"
-          echo "description=$(jq -r . <<< "${INFO_DESCRIPTION}")" >> "$GITHUB_OUTPUT"
-          url=$(jq -r . <<< "${INFO_URL}")
-          if [[ -n "${url}" && "${url}" != "null" ]]; then
-            echo "url=${url}" >> "$GITHUB_OUTPUT"
-          fi
-
-          version=$(jq -r . <<< "${INFO_VERSION}")
-          image_tags="${version}"
-          publish=false
-          if [[ "${EVENT_NAME}" == "push" ]]; then
-            publish=true
-            if [[ "${REF}" == "refs/heads/main" ]]; then
-              # development build from main branch, don't touch "latest"
-              version=dev
-              image_tags=dev
-            else
-              # release build from tag
-              image_tags=$(printf '%s\n%s' "${version}" latest)
-            fi
-          fi
-
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
-          {
-            echo "image_tags<<EOF"
-            echo "${image_tags}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Prepare build matrix
         id: matrix
         uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.09.0
         with:
           architectures: ${{ steps.info.outputs.architectures }}
-          image-name: ${{ steps.normalize.outputs.image_name }}
-          registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
+          image-name: syslog
+
+      # Job outputs containing a secret value are suppressed by GitHub Actions.
+      # The image namespace may equal the DOCKERHUB_USERNAME secret, so only
+      # pass arch and runner between jobs and compose the image in the build job.
+      - name: Strip image names from build matrix
+        id: strip
+        env:
+          MATRIX: ${{ steps.matrix.outputs.matrix }}
+        run: |
+          echo "matrix=$(jq -c 'del(.include[].image)' <<< "${MATRIX}")" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.arch }} syslog app
@@ -109,6 +66,67 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: ${{ env.APP_PATH }}
+
+      - name: Set build information
+        id: normalize
+        env:
+          ARCH: ${{ matrix.arch }}
+          INFO_IMAGE: ${{ steps.info.outputs.image }}
+          INFO_NAME: ${{ steps.info.outputs.name }}
+          INFO_DESCRIPTION: ${{ steps.info.outputs.description }}
+          INFO_URL: ${{ steps.info.outputs.url }}
+          INFO_VERSION: ${{ steps.info.outputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          # info helper returns JSON encoded values, e.g. "mib85/{arch}-ha-addon-syslog"
+          image=$(jq -r . <<< "${INFO_IMAGE}")
+          echo "image=${CONTAINER_REGISTRY}/${image//\{arch\}/${ARCH}}" >> "$GITHUB_OUTPUT"
+
+          labels="io.hass.type=app"
+          labels+=$'\n'"io.hass.name=$(jq -r . <<< "${INFO_NAME}")"
+          labels+=$'\n'"io.hass.description=$(jq -r . <<< "${INFO_DESCRIPTION}")"
+          url=$(jq -r . <<< "${INFO_URL}")
+          if [[ -n "${url}" && "${url}" != "null" ]]; then
+            labels+=$'\n'"io.hass.url=${url}"
+          fi
+          {
+            echo "labels<<EOF"
+            echo "${labels}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          version=$(jq -r . <<< "${INFO_VERSION}")
+          image_tags="${version}"
+          publish=false
+          skip_existing=""
+          if [[ "${EVENT_NAME}" == "push" ]]; then
+            publish=true
+            if [[ "${REF}" == "refs/heads/main" ]]; then
+              # development build from main branch, don't touch "latest"
+              version=dev
+              image_tags=dev
+            else
+              # release build from tag
+              image_tags=$(printf '%s\n%s' "${version}" latest)
+              skip_existing="${version}"
+            fi
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+          echo "skip_existing=${skip_existing}" >> "$GITHUB_OUTPUT"
+          {
+            echo "image_tags<<EOF"
+            echo "${image_tags}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build syslog app
         uses: home-assistant/builder/actions/build-image@2026.09.0
         with:
@@ -117,13 +135,9 @@ jobs:
           container-registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
           container-registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
           context: ${{ env.APP_PATH }}
-          image: ${{ matrix.image }}
-          image-tags: ${{ needs.prepare.outputs.image_tags }}
-          labels: |
-            io.hass.type=app
-            io.hass.name=${{ needs.prepare.outputs.name }}
-            io.hass.description=${{ needs.prepare.outputs.description }}
-            ${{ needs.prepare.outputs.url && format('io.hass.url={0}', needs.prepare.outputs.url) || '' }}
-          push: ${{ needs.prepare.outputs.publish }}
-          skip-existing: ${{ startsWith(github.ref, 'refs/tags/') && needs.prepare.outputs.version || '' }}
-          version: ${{ needs.prepare.outputs.version }}
+          image: ${{ steps.normalize.outputs.image }}
+          image-tags: ${{ steps.normalize.outputs.image_tags }}
+          labels: ${{ steps.normalize.outputs.labels }}
+          push: ${{ steps.normalize.outputs.publish }}
+          skip-existing: ${{ steps.normalize.outputs.skip_existing }}
+          version: ${{ steps.normalize.outputs.version }}
