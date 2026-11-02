@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# Serialize publishing runs on main, since skip-existing only checks whether
+# the version tag exists before building and does not make the push atomic.
+# Outdated pull request runs are cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'publish' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   APP_PATH: "./syslog"
 
