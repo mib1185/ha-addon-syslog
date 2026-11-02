@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+
+- Drop support for the deprecated `armhf`, `armv7` and `i386` architectures
+- Build with Docker BuildKit and the new Home Assistant builder actions
+
 ## 0.5.2
 
 - Rename add-on to app
