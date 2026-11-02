@@ -4,6 +4,7 @@
 
 - Drop support for the deprecated `armhf`, `armv7` and `i386` architectures
 - Build with Docker BuildKit and the new Home Assistant builder actions
+- Publish a multi-arch image to GitHub Container Registry (`ghcr.io/mib1185/ha-addon-syslog`)
 
 ## 0.5.2
 
