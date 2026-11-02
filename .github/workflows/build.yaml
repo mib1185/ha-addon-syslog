@@ -19,7 +19,7 @@ jobs:
     name: Prepare build
     runs-on: ubuntu-latest
     outputs:
-      build_matrix: ${{ steps.matrix.outputs.matrix }}
+      build_matrix: ${{ steps.safe_matrix.outputs.matrix }}
       name: ${{ steps.normalize.outputs.name }}
       description: ${{ steps.normalize.outputs.description }}
       url: ${{ steps.normalize.outputs.url }}
@@ -92,6 +92,13 @@ jobs:
           image-name: ${{ steps.normalize.outputs.image_name }}
           registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
 
+      - name: Remove image names from build matrix
+        id: safe_matrix
+        env:
+          MATRIX: ${{ steps.matrix.outputs.matrix }}
+        run: |
+          echo "matrix=$(jq -c '{include: [.include[] | {arch, os}]}' <<< "${MATRIX}")" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.arch }} syslog app
     needs: prepare
@@ -109,6 +116,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: ${{ env.APP_PATH }}
+
+      - name: Prepare image name
+        id: image
+        env:
+          INFO_IMAGE: ${{ steps.info.outputs.image }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          image=$(jq -r . <<< "${INFO_IMAGE}")
+          image=${image//\{arch\}/${ARCH}}
+          echo "image=${CONTAINER_REGISTRY}/${image}" >> "$GITHUB_OUTPUT"
+
       - name: Build syslog app
         uses: home-assistant/builder/actions/build-image@2026.09.0
         with:
@@ -117,7 +140,7 @@ jobs:
           container-registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
           container-registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
           context: ${{ env.APP_PATH }}
-          image: ${{ matrix.image }}
+          image: ${{ steps.image.outputs.image }}
           image-tags: ${{ needs.prepare.outputs.image_tags }}
           labels: |
             io.hass.type=app
