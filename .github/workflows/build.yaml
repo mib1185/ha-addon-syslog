@@ -132,3 +132,39 @@ jobs:
           registry-prefix: ${{ needs.prepare.outputs.registry_prefix }}
           # never overwrite an already published version
           skip-existing: ${{ needs.prepare.outputs.version }}
+
+  release:
+    name: Draft or publish release
+    needs: [prepare, manifest]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # To create the release and its tag
+      pull-requests: read # To collect merged pull requests for the release notes
+    steps:
+      - name: Check if release tag exists
+        id: tag
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          # exit code 2 means no matching ref, anything else non-zero is an error
+          rc=0
+          git ls-remote --exit-code --tags "${REPO_URL}" "refs/tags/v${VERSION}" || rc=$?
+          if [[ "${rc}" -eq 0 ]]; then
+            echo "Release tag v${VERSION} exists, only update the draft release"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif [[ "${rc}" -eq 2 ]]; then
+            echo "Release tag v${VERSION} does not exist, publish the release"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not check whether release tag v${VERSION} exists"
+            exit 1
+          fi
+
+      - name: Draft or publish release
+        uses: release-drafter/release-drafter@v7.10.0
+        with:
+          commitish: ${{ github.sha }}
+          publish: ${{ steps.tag.outputs.publish }}
+          version: ${{ steps.tag.outputs.publish == 'true' && needs.prepare.outputs.version || '' }}
