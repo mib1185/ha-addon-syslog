@@ -5,50 +5,130 @@ on:
     branches: ["main"]
   push:
     branches: ["main"]
-    tags: ["*"]
+
+permissions:
+  contents: read
+
+# Serialize publishing runs on main, since skip-existing only checks whether
+# the version tag exists before building and does not make the push atomic.
+# Outdated pull request runs are cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'publish' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  APP_PATH: "./syslog"
 
 jobs:
-  build:
-    runs-on: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    name: Build ${{ matrix.arch }} syslog app
-    strategy:
-      matrix:
-        arch: ["aarch64", "amd64", "armhf", "armv7", "i386"]
-        # arch: ["aarch64"]
-
+  prepare:
+    name: Prepare build
+    runs-on: ubuntu-latest
+    outputs:
+      architectures: ${{ steps.info.outputs.architectures }}
+      build_matrix: ${{ steps.matrix.outputs.matrix }}
+      image_name: ${{ steps.normalize.outputs.image_name }}
+      registry_prefix: ${{ steps.normalize.outputs.registry_prefix }}
+      name: ${{ steps.normalize.outputs.name }}
+      description: ${{ steps.normalize.outputs.description }}
+      url: ${{ steps.normalize.outputs.url }}
+      version: ${{ steps.normalize.outputs.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Get information
         id: info
         uses: home-assistant/actions/helpers/info@master
         with:
-          path: "./syslog"
+          path: ${{ env.APP_PATH }}
 
-      - name: Set build arguments
+      - name: Normalize information
+        id: normalize
+        env:
+          INFO_IMAGE: ${{ steps.info.outputs.image }}
+          INFO_NAME: ${{ steps.info.outputs.name }}
+          INFO_DESCRIPTION: ${{ steps.info.outputs.description }}
+          INFO_URL: ${{ steps.info.outputs.url }}
+          INFO_VERSION: ${{ steps.info.outputs.version }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              echo "TEST_FLAG=--test" >> $GITHUB_ENV;
-          fi
-          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-              echo "VERSION_FLAG=--version dev --no-latest" >> $GITHUB_ENV;
+          # info helper returns JSON encoded values, e.g. "ghcr.io/mib1185/ha-addon-syslog"
+          image=$(jq -r . <<< "${INFO_IMAGE}")
+          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
+          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=$(jq -r . <<< "${INFO_NAME}")" >> "$GITHUB_OUTPUT"
+          echo "description=$(jq -r . <<< "${INFO_DESCRIPTION}")" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r . <<< "${INFO_VERSION}")" >> "$GITHUB_OUTPUT"
+          url=$(jq -r . <<< "${INFO_URL}")
+          if [[ -n "${url}" && "${url}" != "null" ]]; then
+            echo "url=${url}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Login to DockerHub
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4.6.0
+      - name: Prepare build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.09.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          architectures: ${{ steps.info.outputs.architectures }}
+          image-name: ${{ steps.normalize.outputs.image_name }}
+          registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
+
+  build:
+    name: Build ${{ matrix.arch }} syslog app
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read # To check out the code
+      id-token: write # Needed for Cosign signing (issue OIDC token for signing)
+      packages: write # To push built images to GitHub Container Registry
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.build_matrix) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build syslog app
-        uses: home-assistant/builder@2025.09.0
+        uses: home-assistant/builder/actions/build-image@2026.09.0
         with:
-          image: ${{ contains(fromJson('["armhf", "armv7", "aarch64"]'), matrix.arch) && 'aarch64' || 'amd64' }}
-          args: |
-            ${{ env.TEST_FLAG }} \
-            ${{ env.VERSION_FLAG }} \
-            --${{ matrix.arch }} \
-            --target /data/syslog \
-            --addon
+          arch: ${{ matrix.arch }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          context: ${{ env.APP_PATH }}
+          image: ${{ matrix.image }}
+          image-tags: |
+            ${{ needs.prepare.outputs.version }}
+            latest
+          labels: |
+            io.hass.type=app
+            io.hass.name=${{ needs.prepare.outputs.name }}
+            io.hass.description=${{ needs.prepare.outputs.description }}
+            ${{ needs.prepare.outputs.url && format('io.hass.url={0}', needs.prepare.outputs.url) || '' }}
+          push: ${{ github.event_name == 'push' }}
+          # never overwrite an already published version
+          skip-existing: ${{ needs.prepare.outputs.version }}
+          version: ${{ needs.prepare.outputs.version }}
+
+  manifest:
+    name: Publish multi-arch manifest
+    needs: [prepare, build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Needed for Cosign signing (issue OIDC token for signing)
+      packages: write # To push the manifest to GitHub Container Registry
+    steps:
+      - name: Publish multi-arch manifest
+        uses: home-assistant/builder/actions/publish-multi-arch-manifest@2026.09.0
+        with:
+          architectures: ${{ needs.prepare.outputs.architectures }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image-name: ${{ needs.prepare.outputs.image_name }}
+          image-tags: |
+            ${{ needs.prepare.outputs.version }}
+            latest
+          registry-prefix: ${{ needs.prepare.outputs.registry_prefix }}
+          # never overwrite an already published version
+          skip-existing: ${{ needs.prepare.outputs.version }}
