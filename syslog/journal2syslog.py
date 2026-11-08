@@ -38,6 +38,17 @@ CONTAINER_PATTERN_MAPPING = {
     "hassio_supervisor": PATTERN_LOGLEVEL_HA,
 }
 
+# Bound how long an unreachable or vanished syslog server can block the handler or
+# silently swallow messages. Without these, a TCP peer that disappears without a
+# reset (e.g. a restarted container behind NAT) keeps sendall() "succeeding" into
+# the kernel send buffer until TCP gives up retransmitting (~15 min on Linux), and
+# connect()/the TLS handshake to an unresponsive server can block indefinitely.
+SOCKET_TIMEOUT = 10  # seconds, for connect, TLS handshake and send
+TCP_KEEPALIVE_IDLE = 30  # seconds idle before the first keepalive probe
+TCP_KEEPALIVE_INTERVAL = 10  # seconds between keepalive probes
+TCP_KEEPALIVE_COUNT = 3  # unanswered probes before the connection is dropped
+TCP_USER_TIMEOUT = 30_000  # ms that sent data may stay unacknowledged
+
 
 class TlsSysLogHandler(logging.handlers.SysLogHandler):
     def __init__(
@@ -54,6 +65,20 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
         if ssl and socktype != socket.SOCK_STREAM:
             raise RuntimeError("TLS is only support for TCP connections")
         super().__init__(address, facility, socktype)
+
+    @staticmethod
+    def _configure_stream_socket(sock: socket.socket) -> None:
+        """Detect dead peers quickly and never block forever."""
+        sock.settimeout(SOCKET_TIMEOUT)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        for option, value in (
+            ("TCP_KEEPIDLE", TCP_KEEPALIVE_IDLE),
+            ("TCP_KEEPINTVL", TCP_KEEPALIVE_INTERVAL),
+            ("TCP_KEEPCNT", TCP_KEEPALIVE_COUNT),
+            ("TCP_USER_TIMEOUT", TCP_USER_TIMEOUT),
+        ):
+            if hasattr(socket, option):  # Linux-specific options
+                sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, option), value)
 
     def _wrap_sock_ssl(self, sock: socket.socket, host: str):
         """Wrap a tcp socket into a ssl context."""
@@ -128,6 +153,8 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
                 err = sock = None
                 try:
                     sock = socket.socket(af, socktype, proto)
+                    if socktype == socket.SOCK_STREAM:
+                        self._configure_stream_socket(sock)
                     if self.ssl:
                         sock = self._wrap_sock_ssl(sock, host)
                     if socktype == socket.SOCK_STREAM:
@@ -137,6 +164,8 @@ class TlsSysLogHandler(logging.handlers.SysLogHandler):
                     err = exc
                     if sock is not None:
                         sock.close()
+                        # don't keep a closed socket, so the next emit reconnects
+                        sock = None
             if isinstance(err, ssl.SSLError):
                 # only fail on ssl errors
                 raise err
